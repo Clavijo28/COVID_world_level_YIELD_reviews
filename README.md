@@ -1,5 +1,7 @@
 #COVID 19 DATA VISUALIZATION
+
 #Introduction
+
 The following report below contains data extracted from “Our Word in Data (OWID)”.
 The data collected during the beginning of the pandemic to date, contain relevant factors that
 help to verify and validate patterns in terms of the number of people affected in all countries
@@ -8,7 +10,9 @@ on a daily basis as well as an analysis of life expectancy compared to the numbe
 100,000 people.
 
 #YELP REVIEWS
+
 #Introduction
+
 The analysis below focuses on evaluating customer perceptions regarding the businesses
 that provide a service to the population. This type of analysis will help businesses to validate
 how the market is behaving in the face of the service provided and thus make decisions that
