@@ -1,0 +1,577 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# Assignment 2 Statistical Programing
+## Christian Becerra Clavijo
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+#WARNING: Please ensure select the link for each of data required before run all code
+
+print("Select the link to extract owid-covid-data.csv file")
+part_1_assig_covid_data <- file.choose()
+print("Select the link to extract yelp_reviews.csv file")
+part_2_Yelp_review <- file.choose()
+
+R_csv1 <- part_1_assig_covid_data
+R_csv2 <- part_2_Yelp_review
+
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(tidyverse)
+require(scales)
+require(reshape)
+library(nortest)
+library(knitr)
+```
+
+# COVID 19 DATA VISUALIZATION
+# Introduction
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The following report below contains data extracted from "Our Word in Data (OWID)". The data collected during the beginning of the pandemic to date, contain relevant factors that help to verify and validate patterns in terms of the number of people affected in all countries worldwide. The following analysis will only focus on total accumulated cases and new cases on a daily basis as well as an analysis of life expectancy compared to the number of cases per 100,000 people.**
+
+# Total number of COVID cases in some countries
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The following graph shows us the total number of cases in the countries of Australia, China, India, New Zealand, Sweden, Russia, United Kingdom, United States. As can be clearly seen, the United States is the country with the most cases worldwide, followed by India and United with values between 10 million and 43 million. Countries like Switzerland, Australia, China and New Zealand have not had significant amounts throughout the pandemic.**
+
+```{r echo=FALSE}
+Covid_data <- read.csv(R_csv1)
+# Select countries to make the Analysis
+Countries <- c("New Zealand","China","Australia","Sweden","Russia","United Kingdom","India","United States")
+
+# Stratified data per locaton in countries selected before and sum the number of new cases
+Covid_cases <- aggregate(new_cases ~ location, Covid_data[Covid_data$location %in% Countries,], sum)
+# Sort the data in descending order
+Covid_cases <- Covid_cases[order(Covid_cases$new_cases,decreasing = T),]
+# Define levels to plot the analysis
+Covid_cases$location <- factor(Covid_cases$location, levels = Covid_cases$location)
+
+ggplot(Covid_cases, aes(x=location, y=new_cases, fill=location)) + 
+  geom_bar(stat="identity") +
+  theme_minimal() +
+  scale_y_continuous(labels=comma)+
+  labs(x="Countries",y="Total of cases",title="Number of total COVID cases per Country")+
+  geom_text(aes(label=new_cases),size = 3, position = position_stack(vjust=1.05))
+```
+
+# Progress of total COVID cases
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The following graph shows us the progress of the number of cases throughout 50 days after the 100th case was confirmed in the countries mentioned. As we can see (since the y-axis is a logothymic scale) the cases were on the rise in the first 25 days, however some countries stabilized the number of cases over time. On the other hand, countries like the United States, United Kingdom and Russia were on the rise with values that reached 100,000 cases in less than 50 days after the 100th case was confirmed. Countries like New Zealand and Australia normalized the number of infections on the 25th, maintaining values of between one thousand and 100 thousand cases.**
+
+```{r echo=FALSE}
+# Startified data to see the progress of the virus on selected countries and filtered since 100 cases, stratify by date an assign number 1 per row to count
+progress_covid <- Covid_data %>%
+  select(location, date, total_cases) %>%
+  filter(location %in% Countries, total_cases >= 100) %>%
+  mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
+  group_by(day = lubridate::floor_date(date,"day"),location) %>%
+  summarize(total_cases_day = sum(total_cases))
+
+# Create a variable to put on x axis
+progress_covid <- ddply(progress_covid, .(location), transform, dayth=rank(location, ties.method="first"))
+
+# Graph number of cases since 100 cases reported in a range of 0 to 50 days on countires selected
+qplot(dayth,total_cases_day,data=progress_covid,colour=location)+
+  geom_line() +
+  geom_point() +
+  scale_y_log10(labels=comma,breaks=c(100,1000,10000,100000), limits=c(100,100000)) +
+  xlim(0,50)+
+  labs(x="Days than 100th confirmed case",y="Cumulative cases",title="Cumulative cases count-log scale")+
+  theme_minimal()
+
+```
+
+\newpage
+
+# Relationship between life expectancy and total number of cases
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The relationship between life expectancy vs the total number of cases per 100,000 people is shown below. For this analysis it was necessary to stratify the data for each value of the variable "life expectancy" and thus be able to extract the mean of the group of values. By means of the scatter diagram, a small trend can be observed between the data, in addition to this, a linear regression was performed to verify the trend.**
+
+```{r echo=FALSE}
+# Extract data of total cases per million column and life expectancy, convert total cases per million to total cases per thousand and summarize the information by mean
+Relation_life.exp_t.number <- Covid_data %>%
+  select(total_cases_per_million,life_expectancy) %>%
+  mutate(total_cases_perthousand = total_cases_per_million*10) %>%
+  group_by(life_expectancy) %>%
+  summarize(total_cases.t = mean(total_cases_perthousand))
+
+ggplot(Relation_life.exp_t.number, aes(x =life_expectancy , y = total_cases.t)) +
+  geom_point(shape=1) +
+  geom_smooth(formula = y ~ x, method = "lm") +
+  scale_y_continuous(labels=comma) +
+  labs(x="Life expectancy",y="Total cases per thousand",title="Correlation analysis between life expectancy vs number of cases per thousand")+
+  theme_minimal()
+
+# Correlation between two variables, total cases per thousand vs life expectancy
+Corretaliton_test <- cor.test(x =Relation_life.exp_t.number$life_expectancy, y=Relation_life.exp_t.number$total_cases.t, method="pearson")
+Corretaliton_test
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**To evaluate the correlation of the two variables, the Pearson's correlation coefficient was performed, which yielded a value of 0.6107, which indicates a not so strong correlation.**
+
+# YELP REVIEWS
+# Introduction
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The analysis below focuses on evaluating customer perceptions regarding the businesses that provide a service to the population. This type of analysis will help businesses to validate how the market is behaving in the face of the service provided and thus make decisions that allow improvement in their processes. Initially, an analysis of the positive and negative words and the perception of thought will be done. This will help us to validate how the customer experiences were. Then a comparison will be made regarding the tendency of positive and negative words as well as the perception of feeling.**
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**In addition, we will enter the length of the reviews in the comparison with the category granted by the customers, this will help us to verify if there is a certain correlation in said rating and we will evaluate how the behavior is in terms of a 5-star rating.Finally, we will observe if there is a relationship between the comments voted useful versus the category by stress and the length of the reviews so we can delve into the strategies that we should implement to overcome certain inconveniences.**
+
+# Overall Statistical Summary
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Below is a statistical summary based on the star category (rating given by consumers) the length of the reviews, positive and negative words. Regarding the category by stars, there was an average rating of 3.74 in all the services evaluated and their rating goes from 1 the lowest to 5 the highest, there is a deviation of the data of at least 1.31 stars.**
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**On the other hand, the length of the reviews had an average of 125 words, a minimum of 0 and a maximum of 1047 words and a dispersion between reviews on average of 115.5 words, in general 75% of the reviews had a length of 125 words .Finally, the positive and negative words had an average of 7.07 and 2.55 respectively, together with a deviation for each group of words of 5.93 for positive words and 3.25 for negative words. The amount of 9 positive words was concentrated in the 75% much higher compared to the value of 4 negative words.**
+
+```{r echo=FALSE}
+Yelp_reviews <- read.csv(R_csv2) %>%
+  mutate(count=1)
+
+# Extract data from main file and stratify by stars, review lenght and possitive and negative words
+s_summary_1 <- Yelp_reviews %>%
+  select(stars,review_length,pos_words,neg_words)
+
+Statistical_sum <- round(fBasics::basicStats(s_summary_1),2)
+kable(Statistical_sum)
+```
+
+\newpage
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**With regard to the perception of feelings regarding the Negative had an average of 2.78 negative words, the highest being a review with 59 positive words and the lowest with a value of 1. Only 4 negative words are included within 75% of the data and there is a deviation between negative words of 2.42. Regarding positive sentiment, there is a maximum value of positive words of 80 and a minimum of 1, which on average yields a value of 5.86 positive words. only 8 positive words are included within 75% of the data.**
+
+```{r echo=FALSE}
+# Extract data of sentiment and stratify by positive an negative, convert negative sentiment in a positive variable in order to make a statistical summary
+Sentiments_rate <- ddply(Yelp_reviews, .(net_sentiment), summarise, Quantity = sum(count)) %>%
+  mutate(Category = ifelse(net_sentiment < 0,"Negative sentiment","Positive sentiment")) %>%
+  mutate(net_sentiment = abs(net_sentiment))
+
+# Summary of negative sentiments, data filtered less than 0
+summary_negative_net.sent <- Yelp_reviews %>%
+  select(net_sentiment) %>%
+  filter(net_sentiment < 0) %>%
+  mutate(net_sentiment = abs(net_sentiment))
+
+Statistical_summ.negative.sent <- round(fBasics::basicStats(summary_negative_net.sent),2)
+
+# Summary of negative sentiments, data filtered greater than 0
+summary_possitive_net.sent <- Yelp_reviews %>%
+  select(net_sentiment) %>%
+  filter(net_sentiment > 0)
+
+Statistical_summ.possitive.sent <- round(fBasics::basicStats(summary_possitive_net.sent),2)
+
+# Make tables nicer
+kable(Statistical_sum.netsent <- rename(merge(Statistical_summ.negative.sent, Statistical_summ.possitive.sent, by = 0, all = TRUE), c(net_sentiment.x="Negative_sentiment",net_sentiment.y="Positive_sent")))
+
+
+```
+
+# Count of possitive and negative words
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The following tables presented below make a stratification of the data to add the amounts that for each number of words.**
+```{r echo=FALSE}
+# Count the number of positive words and extract just the first 20 rows
+Possitive_words <- ddply(Yelp_reviews, .(pos_words), summarise, quantity = sum(count)) %>%
+  mutate(categoria = "Positive words")
+positive.table <- head(Possitive_words[c(1,2)],20)
+
+# Count the number of negative words and extract just the first 20 rows
+Negative_words <- ddply(Yelp_reviews, .(neg_words), summarise, quantity = sum(count)) %>%
+  mutate(categoria = "negative words")
+negative.table <- head(Negative_words[c(1,2)],20)
+
+# Table of positive and negative words together
+Tables_posandneg <- rename(merge(positive.table, negative.table, by = 0, all = TRUE)[c(2,3,4,5)],
+            c(quantity.x = "Quantity", quantity.y = "Quantity"))
+
+kable(Tables_posandneg_ordered <- Tables_posandneg[order(Tables_posandneg$pos_words),])
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Since the tables do not present information to be able to conclude prematurely, a graph was made with the crossing of the two variables (positive words, negative words) in order to evaluate possible trends. Initially we observed that the positive words between 0 and 5 units had an increase of between 50 thousand and values above 100 thousand, however, then it begins to decrease as the number of units for each value increases until reaching values below of 20 thousand between 15 and 20 units.**
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Regarding negative words, there is an increase in the number of units from 0 to 5 words with values above 400 thousand until it drops to less than 100 thousand and so on until it levels off with a number of units less than 20 thousand later. of 10 words. It is also observed that there is a point which is identical in the two categories which is between 0 and 5 units and that correspond to a value above 150 thousand words. As a conclusion, we could say that as the number of units increases, the number of words decreases according to each category (positive and negative).**
+
+```{r echo=FALSE}
+# Put tables from positive and negative word together to plot them in a graph
+Type_of_words <- data.frame(Words=c(Possitive_words[,1], Negative_words[,1]),
+                            Qty=c(Possitive_words[,2], Negative_words[,2]),
+                            Words_Category=c(Possitive_words[,3], Negative_words[,3]))
+
+ggplot(Type_of_words, aes(x=Words, y = Qty, colour = Words_Category)) + 
+  geom_point(size=2.5, alpha = 1.5) +
+  labs(x="Type of words",y="Qty of words",title="Number of Possitive and Negative words") +
+  scale_y_continuous(labels=comma)+
+  theme_minimal()+
+  xlim(0,20)
+```
+
+\newpage
+
+# Count of possitive and negative words to compare sentiments
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The following table shows the number of positive and negative words identified in the reviews of the services offered by the businesses stratified within the data. As can be seen, the positive sentiment increases as the number of word units grows, we could say that within the reviews, the fewer units of positive words there are, the positive sentiment increases, while in the negative sentiment column it seems the opposite.**
+
+```{r echo=FALSE}
+# Stratify the data to extract number of positive words to define positive sentiment
+Possitive_sent <- Sentiments_rate %>%
+  select(net_sentiment, Quantity, Category) %>%
+  filter(Category == "Positive sentiment")
+positive.table_sent <- head(Possitive_sent[c(1,2)],20)
+
+# Stratify the data to extract number of negative words to define negative sentiment
+Negative_sent <- Sentiments_rate %>%
+  select(net_sentiment, Quantity, Category) %>%
+  filter(Category == "Negative sentiment")
+negative.table_sent <- head(Negative_sent[c(1,2)],20)
+
+# Put positive ande negative data table together in order to plot them in a graph
+Tables_posandneg_sent <- rename(merge(positive.table_sent, negative.table_sent, by = 0, all = TRUE)[c(2,3,4,5)],                           c(net_sentiment.x="Positive_Sentiment",net_sentiment.y="Negative_Sentiment",Quantity.x = "Quantity", Quantity.y = "Quantity"))
+
+# Make table nicer
+kable(Tables_posandneg_sent_ordered <- Tables_posandneg_sent[order(Tables_posandneg_sent$Positive_Sentiment),])
+```
+
+\newpage
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The following graph clearly shows us the behavior of the number of positive and negative words that define a positive and negative feeling. First we note that for the positive sentiment it is possible to see that between 0 and units there were ups and downs, reaching a peak of more than 150 thousand words and then gradually decreasing to values below 50 thousand from 10 units. We can say that as the number of word units increases the number of words decreases, that is to say that the more number of units, the lower the positive feeling or perception that consumers have according to a service provided by the businesses in question.**
+
+```{r echo=FALSE}
+# Graph of positive an negatie sentiments together
+ggplot(Sentiments_rate, aes(x=net_sentiment, y = Quantity, colour = Category)) + 
+  geom_point(size=2.5, alpha = 1.5) +
+  labs(x="Sentiment from number of words",y="Quantity of words",title="Quantity of possitve and negative words (net sentiment)") +
+  scale_y_continuous(labels=comma)+
+  theme_minimal()+
+  xlim(0,20)
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**On the other hand, negative sentiment has a similar effect which is that as the word units decrease, the number of words also does so until it stabilizes with values of less than 25 words from 5 units, that is why as the number of units increases the negative sentiment decreases. We can also highlight the peak in the positive sentiment graph which increases around 3 to 5 units, it is possible that consumers have chosen only to describe the service provided by positive adjective.**
+
+\newpage
+
+# Average review length per star category
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Below is an analysis of the star categories awarded by consumers to the different services. These categories range from 1 being the but rated to 5 being the best rated. We observe that the categories have a descending order as the number of stars decreases, that is, the better the service is rated, the shorter the length of the review (all this analysis is measured by the length of the reviews). The standard deviation measure is also observed in decrease, having a dispersion of the data between 143 and 102 for ratings 1 and 5 stars respectively.**
+
+```{r echo=FALSE}
+# Initial statistical summary of stars category
+Initial_summarise_stars <- Yelp_reviews %>%
+  group_by(stars) %>%
+  summarize(Mean = mean(review_length), Median = median(review_length), Standar_desviation=sd(review_length), IQR=IQR(review_length))
+# Make table nicer
+kable(Initial_summarise_stars)
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**In this study we will focus on the median since given the amount of data it may be that there are many atypical data that could distort the results, that is why within the central tendency measures the IQR was included to verify the distance (as a measure of dispersion) between the first and third quartiles. As we observed in the previous table, the IQR measure also seems to be decreasing as the category of stars increases from 141 to 97, that is, within that 50% that represents the subtraction of between 25% and 75% of the data, there is a dispersion that is equivalent to the mentioned value of 141, and so on until the 5-star category that has a dispersion of 97.**
+
+```{r echo=FALSE}
+# Graph of data behavior of review length to analyse which central tendency mean should be used
+ggplot(data=Yelp_reviews, aes(x=review_length)) + 
+  geom_histogram(breaks=seq(10, 300, by=10), 
+                 col="black", 
+                 fill="gray", 
+                 alpha = .2) + 
+  labs(title="Histogram for Review Length", x="Review Length", y="Number of characters") +
+  theme_minimal()
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**In order to continue with this study, it was necessary to perform a normality test, therefore a histogram was performed to analyze the behavior of the data. As can be seen in the previous graph, the graph has a smooth tendency to the left side and does not have a totally symmetrical curve, however it seems to have a parallel displacement as the values ​​of the x axis increase and decrease. In order not to make a premature conclusion, the Anderson Darling test was carried out to validate this assumption.**
+
+```{r echo=FALSE}
+# Normality test to identify and validate the normal behavior of the data review lenght
+nortest::ad.test(Yelp_reviews$review_length)
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The p-value produced by the test is below the significance level, therefore we reject the null hypothesis and we can say that the data have normal behavior. From here we can make use of the median central tendency measure and we will observe a box plot to validate possible outliers and perform some kind of cleaning in the data.**
+
+```{r echo=FALSE}
+# Firts boxplot of stars category data
+ggplot(Yelp_reviews, aes(x=stars, y=review_length, fill=factor(stars)))+
+  geom_boxplot() +
+  theme_minimal() +
+  labs(x="Category Stars",y="Review length",title="Initial Boxplot of Review Length per Stars")
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The graph above shows the category of stars on the x-axis vs the length of the reviews on the y-axis. Nothing can be concluded even since there are many atypical data to the graph which can be seen in the upper part of each one, that is why it was decided to perform a cleaning by eliminating the data from the 3rd percentile of the box plot in category number 5, that is, all of the data were eliminated from 75% of the data for all categories and the box plot was redone**
+
+\newpage
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Next, the data of the percentiles are extracted to verify from which value the elimination of the data will begin. **
+
+```{r echo=FALSE}
+# Extract outliers from stars category data in order to clean table and calculate the median
+outliers_identified <- Yelp_reviews %>%
+  select(stars,review_length) %>%
+  filter(stars == 5)
+
+# Identify outliers from data
+outliers_n1 <- boxplot.stats(outliers_identified$review_length)
+outliers_n1$stats
+
+# Eliminate outliers from data
+Eliminate_outliers_n1 <- Yelp_reviews[Yelp_reviews$review_length < outliers_n1$stats[[5]],]
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**We observe that the 3rd percentile has a value of 282, which indicates that after this value the rest are atypical data that could distort the mean of the median central tendency, that is why we will proceed to eliminate them and make a new graph.**
+
+```{r echo=FALSE}
+# Calculate statistical summary again with data cleaned
+summarise_stars <- Eliminate_outliers_n1 %>%
+  group_by(stars) %>%
+  summarize(mean = mean(review_length), median = median(review_length), sd=sd(review_length), IQR=IQR(review_length))
+
+# Calculate means (median in this cases)
+means <- round(aggregate(review_length ~  stars, Eliminate_outliers_n1, mean),2)
+kable(summarise_stars)
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The graph above shows us how the measures of central tendency changed so that for the category number 1 of stars it decreased to 107 falling to 86.9 for the category 5 stars. The median measurements seem to have a small dispersion because star category number 1 has a value of 93 and category 2 has a value of 102, that is, no trend is observed. The standard deviation began to have values around 67 and 68 on average for all star categories as well as the IQR with measurements between 80 and 100. The new box plot is presented below.**
+
+```{r echo=FALSE}
+# Plot again the box plot without certain quantity of outliers
+ggplot(Eliminate_outliers_n1, aes(x=stars, y=review_length, fill=factor(stars)))+
+  geom_boxplot() +
+  theme_minimal() +
+  labs(x="Category Stars",y="Review length",title="Boxplot of Review Length per Stars") +
+  stat_summary(fun=mean, colour="darkred", geom="point", shape=18, size=3, show.legend=FALSE)  + 
+  geom_text(data = means, aes(label = review_length, y = review_length + 0.08), position = position_stack((vjust=0.95)))
+  
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The new box plot shows us the values ​​adjusted by category, we also wanted to place the value of the mean to compare it with the median and we observed that they differ a little from each other. What we can conclude is that the average length of reviews is lower when there is a category of stars number 5, that is to say that as the category is low, the average length of the reviews is high. We can also rescue that there is no significant difference between category 2 and 3 stars given that if the measures of central tendency are similar, and it should also be noted that category 5 still has some atypical data, however it was only necessary to perform a cleaning of data so as not to sacrifice quantity.**
+
+# Analisys of reviews voted as useful vs star-rating and length of the review
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The following analysis focuses on the number of helpful votes looking for a relationship with the length of the reviews and the given star rating. For practical purposes, a previous graph was made and much variation of the data was identified from a number of reviews length of 400 and a number of useful votes of 20, that is why these data were eliminated and possible trends were evaluated.**
+
+```{r echo=FALSE}
+# Exract data from votes useful and review length, filter vote useful less than 20 and review length greater than 400 in order to avoid outliers in the graph
+Summary_votes.useful <- Yelp_reviews %>%
+  select(votes_useful,review_length,stars) %>%
+  filter(votes_useful < 20, review_length < 400) %>%
+  group_by(votes_useful, stars) %>%
+  summarise(stars = mean(stars), review_length = mean(review_length))
+
+# Make table nicer
+kable(head(Summary_votes.useful,20))
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**The stratification process consisted of filtering the data for an amount of 20 as useful voted and 400 with respect to the length of the reviews, a grouping was carried out that allowed the data to be gathered by means of the category of stars and finally I use the meadia as the main measure of central tendency to make a grouping much more in line with a scatter plot. The graph is presented below**
+
+```{r echo=FALSE}
+# Plot the data (votes useful , review length and stars) to see tendency and correlation between variables
+ggplot(data=Summary_votes.useful, mapping = aes(x = votes_useful, y = review_length)) + 
+  geom_point(aes(color = stars))+
+  labs(x="Votes Useful",y="Review length",title="Relationship between Votes Useful, Review Length and Stars") +
+  theme_minimal()
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**In the previous graph it is possible to observe that there is a certain correlation between the variable Review length and useful voted because there is an upward trend that increases as the variable useful voted increases. It should also be noted that there is no dispersion in the data regarding the category of stars, that is to say that each category seems to follow a certain symmetry within the graph following a pattern that could describe a high trend. However, it may be that as the useful votes rise, there will tend to be a stabilization.**
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**To verify and validate the existing relationship, a pearson correlation analysis is presented below and thus conclude which variables are the ones that most influence the useful voted variable.**
+
+```{r echo=FALSE}
+# Calculate the correlation among several variables
+correlation <- cor(Summary_votes.useful)
+kable(correlation)
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**As can be seen, there is no correlation between the variables of the category of stars and votes useful, the length of the reviews has a negative correlation with respect to the category of stars with a value of -0.453. We also observe that there is a strong relationship between useful votes and the length of the reviews since the value is 0.86454, that is, this variable is strongly correlated and can describe almost 90% of the statistical model.**
+
+```{r echo=FALSE}
+# Filter data of votes useful and select data cleaned to plot (data selected without stars given that correlation test do not satisfy the hypothesis)
+Relation_votes.useful_review.length <- Summary_votes.useful %>%
+  select(votes_useful,review_length)
+
+# Plot again data cleaned (review length and votes useful) and calculate linear regression
+ggplot(data=Relation_votes.useful_review.length, mapping = aes(x = votes_useful, y = review_length)) + 
+  geom_point() +
+  theme_minimal() +
+  geom_smooth(formula = y ~ x, method = "lm")
+```
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**Given the analysis described above, the stratification of the two variables that had a high correlation was carried out and they were plotted within a scatter diagram together with a linear regression, which is increasing as the length of the reviews increases.**
+
+# CONCLUSIONS
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**- The graph of positive and negative words shows us that the more words the comment has, the less number of words, both positive and negative, will be present. In other words, for older adults the two variables will have the same behavior.**
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**- Both positive and negative feelings have a behavior similar to the variables of positive and negative words, however it is possible to observe that there is a tendency to identify the groups of words of quantity 0 to 5 that are larger in quantity than the number of negative words identified to define negative sentiment, which we could conclude as the more words the review has, the more positive than negative words will be found.**
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**- When appearing there is not a big difference between the average length of the reviews compared to the category of stars between 1 and 3 stars. After category 4 and 5 stars seem to have a lower average, that is why we could conclude that the services rated excellently by consumers are usually written short in the reviews.**
+
+<style>
+body {
+text-align: justify}
+</style>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**- There is a positive and ascending correlation between the variables of length review and votes useful, initially we could conclude that the longer the length of the reviews, the greater the number of useful votes will be, however it is necessary to evaluate this type a little more thoroughly relationship for. It is also necessary to emphasize what type of words are described in the review in relation to the vote and to be able to follow a process of continuous improvement in subsequent services.**
