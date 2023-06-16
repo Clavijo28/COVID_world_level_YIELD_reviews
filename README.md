@@ -1,6 +1,6 @@
-#COVID 19 DATA VISUALIZATION
+COVID 19 DATA VISUALIZATION
 
-#Introduction
+Introduction
 
 The following report below contains data extracted from “Our Word in Data (OWID)”.
 The data collected during the beginning of the pandemic to date, contain relevant factors that
@@ -9,9 +9,9 @@ worldwide. The following analysis will only focus on total accumulated cases and
 on a daily basis as well as an analysis of life expectancy compared to the number of cases per
 100,000 people.
 
-#YELP REVIEWS
+YELP REVIEWS
 
-#Introduction
+Introduction
 
 The analysis below focuses on evaluating customer perceptions regarding the businesses
 that provide a service to the population. This type of analysis will help businesses to validate
